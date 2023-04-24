@@ -36,8 +36,8 @@ program testcomms
     buf_size = 512*1000
 
     ! Set the size in bytes of the buffer
-    size_in_bytes = buf_size * real4_size
 
+    size_in_bytes = buf_size * real4_size
 
     ! Allocate the buffers andd pre-initiialize both to 0
     call nvtxStartRange("Allocate buffers")
@@ -47,7 +47,6 @@ program testcomms
     call nvtxStartRange("Pre-init buffers")
     x(:) = 0.0
     y(:) = 0.0
-
     call nvtxEndRange
 
     ! Form comm windows using x as buffer
@@ -62,26 +61,33 @@ program testcomms
 
     ! Iterate
     call nvtxStartRange("Iterate")
+    !$acc data create(x(:)) copyout(y(:))
     do iter = 1,numIters
         ! Fill the arrays
         call nvtxStartRange("Fill arrays")
+        !$acc parallel loop
         do i = 1,buf_size
             x(i) = myRank + 0.5
             y(i) = 1.5
         end do
+        !$acc end parallel loop
         call nvtxEndRange
 
         ! Jordi's kernel
         call nvtxStartRange("Jordi's kernel")
+        !$acc parallel loop
         do i = 1,buf_size
             y(i) = 2.0*(x(i)**2) + (y(i)**2) - 2.0*(x(i)**2) + (y(i)**2) + (myRank+1)*1.0
         end do
+        !$acc end parallel loop
         call nvtxEndRange
 
         ! Rank 0 puts y into window of rank 1
         if (myRank .eq. 0) then
             call nvtxStartRange("Rank 0 put")
+            !$acc host_data use_device(x,y)
             call MPI_Put(y, buf_size, MPI_REAL4, 1, target_disp, buf_size, MPI_REAL4, MPI_win, MPI_ierr)
+            !$acc end host_data
             call nvtxEndRange
         end if
 
@@ -91,7 +97,15 @@ program testcomms
         call nvtxEndRange
 
     end do
+    !$acc end data
     call nvtxEndRange
+
+    ! Print results
+#ifdef DEBUG
+    do i = 1,buf_size
+        write(*,*) myRank, i, y(i), x(i)
+    end do
+#endif
 
     ! Destroy the window
     call nvtxStartRange("Destroy window")
@@ -102,7 +116,6 @@ program testcomms
     call nvtxStartRange("Deallocate arrays")
     deallocate(x, y)
     call nvtxEndRange
-
 
     ! Finalize thhe MPI environment
     call MPI_Finalize(MPI_ierr)
