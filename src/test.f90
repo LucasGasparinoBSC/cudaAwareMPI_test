@@ -37,59 +37,60 @@ program testcomms
 
     ! Set the size in bytes of the buffer
     size_in_bytes = buf_size * real4_size
+    
 
     ! Allocate the buffers andd pre-initiialize both to 0
-    call nvtxRangePush("Allocate buffers")
+    call nvtxStartRange("Allocate buffers")
     allocate(x(buf_size), y(buf_size))
-    call nvtxRangePop()
+    call nvtxEndRange
 
-    call nvtxRangePush("Pre-init buffers")
+    call nvtxStartRange("Pre-init buffers")
     x(:) = 0.0
     y(:) = 0.0
-    call nvtxRangePop()
+    call nvtxEndRange
 
     ! Form comm windows using x as buffer
-    call nvtxRangePush("Form comm windows")
+    call nvtxStartRange("Form comm windows")
     call MPI_Win_create(x, size_in_bytes, real4_size, MPI_INFO_NULL, MPI_COMM_WORLD, MPI_win, MPI_ierr)
-    call nvtxRangePop()
+    call nvtxEndRange
 
     ! Fence before operations
-    call nvtxRangePush("Fence")
+    call nvtxStartRange("Fence")
     call MPI_Win_fence(0, MPI_win, MPI_ierr)
-    call nvtxRangePop()
+    call nvtxEndRange
 
     ! Iterate
-    call nvtxRangePush("Iterate")
+    call nvtxStartRange("Iterate")
     do iter = 1,numIters
         ! Fill the arrays
-        call nvtxRangePush("Fill arrays")
+        call nvtxStartRange("Fill arrays")
         do i = 1,buf_size
             x(i) = myRank + 0.5
             y(i) = 1.5
         end do
-        call nvtxRangePop()
+        call nvtxEndRange
 
         ! Jordi's kernel
-        call nvtxRangePush("Jordi's kernel")
+        call nvtxStartRange("Jordi's kernel")
         do i = 1,buf_size
             y(i) = 2.0*(x(i)**2) + (y(i)**2) - 2.0*(x(i)**2) + (y(i)**2) + (myRank+1)*1.0
         end do
-        call nvtxRangePop()
+        call nvtxEndRange
 
         ! Rank 0 puts y into window of rank 1
         if (myRank .eq. 0) then
-            call nvtxRangePush("Rank 0 put")
+            call nvtxStartRange("Rank 0 put")
             call MPI_Put(y, buf_size, MPI_REAL4, 1, target_disp, buf_size, MPI_REAL4, MPI_win, MPI_ierr)
-            call nvtxRangePop()
+            call nvtxEndRange
         end if
 
         ! Fence after comms
-        call nvtxRangePush("Fence")
+        call nvtxStartRange("Fence")
         call MPI_Win_fence(0, MPI_win, MPI_ierr)
-        call nvtxRangePop()
+        call nvtxEndRange
 
     end do
-    call nvtxRangePop()
+    call nvtxEndRange
 
     ! Finalize thhe MPI environment
     call MPI_Finalize(MPI_ierr)
