@@ -37,7 +37,7 @@ program testcomms
 
     ! Set the size in bytes of the buffer
     size_in_bytes = buf_size * real4_size
-    
+
 
     ! Allocate the buffers andd pre-initiialize both to 0
     call nvtxStartRange("Allocate buffers")
@@ -47,6 +47,7 @@ program testcomms
     call nvtxStartRange("Pre-init buffers")
     x(:) = 0.0
     y(:) = 0.0
+
     call nvtxEndRange
 
     ! Form comm windows using x as buffer
@@ -91,6 +92,17 @@ program testcomms
 
     end do
     call nvtxEndRange
+
+    ! Destroy the window
+    call nvtxStartRange("Destroy window")
+    call MPI_Win_free(MPI_win, MPI_ierr)
+    call nvtxEndRange
+
+    ! Deallocate arrays
+    call nvtxStartRange("Deallocate arrays")
+    deallocate(x, y)
+    call nvtxEndRange
+
 
     ! Finalize thhe MPI environment
     call MPI_Finalize(MPI_ierr)
